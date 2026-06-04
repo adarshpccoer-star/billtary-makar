@@ -1,0 +1,1 @@
+export const WELCOME_TEXT = "*Welcome to the bot! plas use /template and send you acroform pdf to fill it out*";
