@@ -2,10 +2,11 @@ import dotenv from "dotenv";
 dotenv.config();
 import { Markup, type Telegraf } from "telegraf";
 import fs from "fs";
+import path from "path"; // Added path module
 import axios from "axios";
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, rgb } from "pdf-lib"; 
 import { message } from "telegraf/filters";
-import fontkit from "@pdf-lib/fontkit"; // Required for custom fonts
+import fontkit from "@pdf-lib/fontkit";
 
 export function registerHandlers(bot: Telegraf) {
   const waitingForTemplate = new Set<string>();
@@ -131,52 +132,43 @@ export function registerHandlers(bot: Telegraf) {
 
       const copies = ["Consignor Copy", "Transport Copy", "Driver Copy"];
 
-      // Read Font files from your local system/project repository
-      // Ensure you have Consolas-Bold.ttf and Cambria-Bold.ttf in your directory
-  // 1. Get Consolas Bold straight from your Windows system fonts folder
-const consolasBoldPath = "C:\\Windows\\Fonts\\consolab.ttf"; 
-
-// 2. Keep your custom Cambria Bold path on your desktop folder
-const cambriaBoldPath = "C:\\Users\\Adharsh\\OneDrive\\Desktop\\tele-bil\\telegram\\Cambria-Bold.ttf";
+      // Setup paths relative to your project root folder
+   // Setup paths pointing to the files inside your telegram folder
+const consolasBoldPath = path.join(process.cwd(), "telegram", "Consolas.ttf");
+const cambriaBoldPath = path.join(process.cwd(), "telegram", "Cambria-Bold.ttf");
       const consolasBoldBuffer = fs.readFileSync(consolasBoldPath);
       const cambriaBoldBuffer = fs.readFileSync(cambriaBoldPath);
+
       for (const copyType of copies) {
         const pdfDoc = await PDFDocument.load(response.data);
-        
-        // Register the fontkit module to embed custom TrueType fonts
         pdfDoc.registerFontkit(fontkit);
 
-        // Embed the Bold variants into the current document instance
         const embeddedConsolasBold = await pdfDoc.embedFont(consolasBoldBuffer);
         const embeddedCambriaBold = await pdfDoc.embedFont(cambriaBoldBuffer);
 
         const form = pdfDoc.getForm();
 
-        // 1. Fill out user fields with Consolas Bold
+        // 1. Populating User Fields (Consolas Bold)
         Object.entries(formState.answers).forEach(([fieldName, value]) => {
           try {
             const textField = form.getTextField(fieldName);
             textField.setText(value);
-            
-            // Apply Consolas Bold to regular form text fields
             textField.updateAppearances(embeddedConsolasBold);
           } catch {
-            // Field might not exist or isn't a text field, safely skip
+            // Safely bypass missing fields
           }
         });
 
-        // 2. Fill the "CopyName" field with Cambria Bold
+        // 2. Populating Copy Identification Title (Cambria Bold)
         try {
           const copyNameField = form.getTextField("CopyName");
           copyNameField.setText(copyType);
-          
-          // Apply Cambria Bold to the specific copy title field
           copyNameField.updateAppearances(embeddedCambriaBold);
         } catch (err) {
-          console.warn(`Could not find or set 'CopyName' field for ${copyType}`);
+          console.warn(`Could not find or style 'CopyName' field for ${copyType}`);
         }
 
-        // Flatten the form to permanently lock the text styling into the layouts
+        form.updateFieldAppearances(embeddedConsolasBold);
         form.flatten();
 
         const pdfBytes = await pdfDoc.save();
